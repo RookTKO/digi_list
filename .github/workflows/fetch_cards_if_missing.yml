@@ -1,12 +1,11 @@
-name: Fetch Digimon Cards If Missing
-
+name: Insta Fetch if Missing Digimon Cards
 on:
   push:
     branches:
       - main
 
 jobs:
-  fetch-cards-missing:
+  fetch-cards-if-missing:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -26,3 +25,20 @@ jobs:
           else
             echo "card_data folder exists. No action needed."
           fi
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and Push Changes
+        run: |
+          if [ "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Update card data from fetch_cards script"
+            git push
+          else
+            echo "No changes to commit"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

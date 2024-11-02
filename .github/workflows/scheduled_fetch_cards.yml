@@ -3,9 +3,8 @@ name: Scheduled Fetch Digimon Cards
 on:
   schedule:
     - cron: '0-29 2 * * *' # Run daily between 2:00 and 2:30 AM
-
 jobs:
-  scheduled-fetch-cards:
+  fetch-cards-if-missing:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -16,12 +15,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq curl
 
-      - name: Check for card_data Folder and Run Script if Exists
+      - name: Fetch Cards
         run: |
-          if [ -d "card_data" ]; then
-            echo "card_data folder exists. Running script..."
+            echo "Running fetch_cards script..."
             chmod +x ./scripts/fetch_cards.sh
             ./scripts/fetch_cards.sh
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and Push Changes
+        run: |
+          if [ "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Update card data from fetch_cards script"
+            git push
           else
-            echo "card_data folder does not exist. Skipping run."
+            echo "No changes to commit"
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
