@@ -1,0 +1,27 @@
+name: Scheduled Fetch Digimon Cards
+
+on:
+  schedule:
+    - cron: '0-29 2 * * *' # Run daily between 2:00 and 2:30 AM
+
+jobs:
+  scheduled-fetch-cards:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Check for card_data Folder and Run Script if Exists
+        run: |
+          if [ -d "card_data" ]; then
+            echo "card_data folder exists. Running script..."
+            chmod +x ./scripts/fetch_cards.sh
+            ./scripts/fetch_cards.sh
+          else
+            echo "card_data folder does not exist. Skipping run."
+          fi

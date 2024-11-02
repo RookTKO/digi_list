@@ -1,0 +1,28 @@
+name: Fetch Digimon Cards If Missing
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  fetch-cards-missing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Check for card_data Folder and Run Script if Missing
+        run: |
+          if [ ! -d "card_data" ]; then
+            echo "card_data folder does not exist. Running script..."
+            chmod +x ./scripts/fetch_cards.sh
+            ./scripts/fetch_cards.sh
+          else
+            echo "card_data folder exists. No action needed."
+          fi
