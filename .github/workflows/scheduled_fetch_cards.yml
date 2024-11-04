@@ -1,5 +1,9 @@
 name: Scheduled Fetch Digimon Cards
 
+# Set permissions for the workflow
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: '0-29 2 * * *' # Run daily between 2:00 and 2:30 AM

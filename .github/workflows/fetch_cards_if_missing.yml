@@ -1,4 +1,9 @@
 name: Insta Fetch if Missing Digimon Cards
+
+# Set permissions for the workflow
+permissions:
+  contents: write
+
 on:
   push:
     branches:
