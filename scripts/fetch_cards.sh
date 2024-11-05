@@ -33,21 +33,49 @@ fi
 # Check if all_cards.json exists
 all_cards_file="$output_dir/all_cards.json"
 temp_all_cards_file="$output_dir/new_all_cards.json"
+diff_card_numbers=()
+
 if [ -f "$all_cards_file" ]; then
     print_header "Fetching all cards from API and comparing with existing data"
     curl --location "$base_url" -o "$temp_all_cards_file"
     
-    # Get card numbers from the new file
-    new_card_numbers=$(jq -r '.[].cardnumber' "$temp_all_cards_file")
-    
-    # Get card numbers from the existing file
-    existing_card_numbers=$(jq -r '.[].cardnumber' "$all_cards_file")
+    # Iterate through each card in the new file
+    while read -r card; do
+        card_number=$(echo "$card" | jq -r '.cardnumber')
+        prefix=$(echo "$card_number" | cut -d'-' -f1)
+        prefix_file="$output_dir/${prefix}.json"
+        
+        # Check if the prefix file exists and if the card exists in that file
+        if [ -f "$prefix_file" ]; then
 
-    # Find the difference between the new and existing card numbers
-    diff_card_numbers=$(comm -23 <(echo "$new_card_numbers" | sort) <(echo "$existing_card_numbers" | sort))
+            card_exists=$(jq --arg card_number "$card_number" 'any(.[]; .id == $card_number)' "$prefix_file")
 
-    # Check if there are any new or changed cards
-    if [ -z "$diff_card_numbers" ]; then
+            echo -e "${GREEN}Checking card number $card_number in $prefix_file${NC}"
+            # print card_exists value for debugging
+            echo -e "${GREEN}Card exists: $card_exists${NC}"
+            if [ "$card_exists" != "true" ]; then
+                # This card is new or updated, so it needs processing
+                echo -e "${YELLOW}============================================================${NC}"
+                echo -e "${YELLOW}Card number $card_number is new or updated.${NC}"
+                echo -e "${YELLOW}Card name: $(echo "$card" | jq -r '.name')${NC}"
+                echo -e "${YELLOW}============================================================${NC}"
+                diff_card_numbers+=("$card_number")
+            else 
+                # This card already exists in the prefix file
+                echo -e "${GREEN}Card number $card_number already exists in $prefix_file. Skipping.${NC}"
+            fi
+        else
+            # The prefix file does not exist, so this card needs processing
+            echo -e "${YELLOW}Prefix file $prefix_file does not exist.${NC}"
+            diff_card_numbers+=("$card_number")
+        fi
+    done < <(jq -c '.[]' "$temp_all_cards_file")
+    echo -e "${GREEN}Finished comparing all cards.${NC}"
+    # Print the card numbers length of array that need processing
+    echo -e "${YELLOW}Card numbers that need processing:${NC} ${#diff_card_numbers[@]}"
+
+    # Check if any new or changed card numbers were found
+    if [ ${#diff_card_numbers[@]} -eq 0 ]; then
         echo -e "${GREEN}No new cards found. Exiting.${NC}"
         rm "$temp_all_cards_file" # Clean up
         exit 0
@@ -62,11 +90,11 @@ else
     echo -e "${GREEN}Saved fetched data to: ${all_cards_file}${NC}"
 
     # Get all card numbers from the new file
-    diff_card_numbers=$(jq -r '.[].cardnumber' "$all_cards_file")
+    diff_card_numbers=($(jq -r '.[].cardnumber' "$all_cards_file"))
 fi
 
 # Loop through each new or changed card number and fetch detailed data
-for card_number in $diff_card_numbers; do
+for card_number in "${diff_card_numbers[@]}"; do
     print_header "Processing card number: $card_number"
     prefix=$(echo "$card_number" | cut -d'-' -f1)
 
@@ -173,7 +201,7 @@ for card_number in $diff_card_numbers; do
         # Check if the card already exists in the master file
         if ! jq -e --arg card_number "$card_number" '.[] | select(.cardnumber == $card_number)' "$master_file" > /dev/null; then
             echo -e "${GREEN}Appending new card data for: $card_number${NC}"
-            if jq ". += [$card_data]" "$master_file" > "$master_file.tmp"; then
+            if jq ". += [$card_data]" "$master_file" | jq 'sort_by(.id)' > "$master_file.tmp"; then
                 mv "$master_file.tmp" "$master_file"
                 echo -e "${GREEN}Appended card number: $card_number to $master_file${NC}"
             else
